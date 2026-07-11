@@ -1,0 +1,9 @@
+# Path redirects only. Domain-level www redirect is configured in Cloudflare Bulk Redirects.
+/dashboard/qld/* /qld/:splat 301
+/dashboard/sso/* /sso/:splat 301
+/dashboard/btc/* /btc/:splat 301
+/dashboard/metlife/* /metlife/:splat 301
+/dashboards/qld/* /qld/:splat 301
+/dashboards/sso/* /sso/:splat 301
+/dashboards/btc/* /btc/:splat 301
+/dashboards/metlife/* /metlife/:splat 301

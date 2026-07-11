@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>AIPeterLab | Dashboard Hub</title>
+    <meta
+      name="description"
+      content="AIPeterLab is a public hub for market signal dashboards, research trackers, and operating pages."
+    >
+    <link rel="canonical" href="https://aipeterlab.com/">
+    <meta property="og:title" content="AIPeterLab Dashboard Hub">
+    <meta
+      property="og:description"
+      content="A public hub for AIPeterLab dashboards and research trackers."
+    >
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://aipeterlab.com/">
+    <meta name="twitter:card" content="summary">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="AIPeterLab home">
+        <span class="brand-mark" aria-hidden="true">A</span>
+        <span>AIPeterLab</span>
+      </a>
+      <nav class="top-nav" aria-label="Primary navigation">
+        <a href="#dashboards">Dashboards</a>
+        <a href="#setup">Publish Plan</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <h1>AIPeterLab</h1>
+          <p>
+            A public home for strategy signal desks, market trackers, and
+            research dashboards.
+          </p>
+          <div class="hero-actions" aria-label="Primary actions">
+            <a class="button primary" href="#dashboards">View dashboards</a>
+            <a class="button secondary" href="#setup">Cloudflare setup</a>
+          </div>
+        </div>
+        <div class="hero-visual" aria-label="Dashboard preview">
+          <div class="status-strip">
+            <span>Dashboard Hub</span>
+            <strong>Cloudflare Pages ready</strong>
+          </div>
+          <div class="signal-board">
+            <div class="signal-row">
+              <span>QLD Signal Desk</span>
+              <strong>Coming soon</strong>
+            </div>
+            <div class="signal-row">
+              <span>SSO Signal Desk</span>
+              <strong>Coming soon</strong>
+            </div>
+            <div class="signal-row">
+              <span>BTC Cycle Desk</span>
+              <strong>Coming soon</strong>
+            </div>
+            <div class="chart-lines" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="section" id="dashboards">
+        <div class="section-heading">
+          <h2>Dashboard Links</h2>
+          <p>
+            These paths are ready now, so future dashboard migrations can keep
+            stable public addresses.
+          </p>
+        </div>
+
+        <div class="dashboard-grid">
+          <a class="dashboard-card" href="/qld/">
+            <span class="dashboard-code">QLD</span>
+            <h3>QLD Signal Desk</h3>
+            <p>QQQ signal source, QLD/cash operating dashboard.</p>
+          </a>
+          <a class="dashboard-card" href="/sso/">
+            <span class="dashboard-code">SSO</span>
+            <h3>SSO Signal Desk</h3>
+            <p>SPY signal source, SSO/cash operating dashboard.</p>
+          </a>
+          <a class="dashboard-card" href="/btc/">
+            <span class="dashboard-code">BTC</span>
+            <h3>BTC Cycle Desk</h3>
+            <p>Bitcoin cycle dashboard and context indicators.</p>
+          </a>
+          <a class="dashboard-card" href="/metlife/">
+            <span class="dashboard-code">M91</span>
+            <h3>MetLife Match 91 Tracker</h3>
+            <p>Public tournament tracker and report entry point.</p>
+          </a>
+        </div>
+      </section>
+
+      <section class="section setup-section" id="setup">
+        <div class="section-heading">
+          <h2>Cloudflare Pages Settings</h2>
+          <p>Use these values when connecting this repository to Cloudflare.</p>
+        </div>
+        <div class="setup-list" aria-label="Cloudflare Pages settings">
+          <div>
+            <span>Production branch</span>
+            <strong>main</strong>
+          </div>
+          <div>
+            <span>Build command</span>
+            <strong>exit 0</strong>
+          </div>
+          <div>
+            <span>Build output directory</span>
+            <strong>/</strong>
+          </div>
+          <div>
+            <span>Primary custom domain</span>
+            <strong>aipeterlab.com</strong>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <span>AIPeterLab</span>
+      <a href="https://aipeterlab.com/">aipeterlab.com</a>
+    </footer>
+  </body>
+</html>
