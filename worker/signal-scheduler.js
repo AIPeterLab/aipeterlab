@@ -33,7 +33,7 @@ export default {
         ok: true,
         service: "aipeterlab-signal-scheduler",
         dashboards: DASHBOARDS.map(({ name, repo, ref }) => ({ name, repo, ref })),
-        schedule: "Dispatches at 6 PM America/New_York via 22:20/23:20 UTC cron gates.",
+        schedule: "Dispatches at 6:15 PM America/New_York via 22:15/23:15 UTC cron gates.",
       });
     }
 

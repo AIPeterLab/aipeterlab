@@ -49,7 +49,7 @@ Some dashboard pages are placeholders so the public paths are stable before each
 
 This repo also contains a separate Cloudflare Worker, `aipeterlab-signal-scheduler`, that can replace GitHub's unreliable `schedule` event for the three signal dashboards.
 
-The Worker runs at `22:20` and `23:20` UTC and dispatches GitHub workflows only when the current hour in `America/New_York` is `18`. That keeps the effective refresh time at 6 PM New York time across daylight-saving changes.
+The Worker runs at `22:15` and `23:15` UTC and dispatches GitHub workflows only when the current hour in `America/New_York` is `18`. That keeps the effective refresh time at 6:15 PM New York time across daylight-saving changes.
 
 Target workflows:
 
