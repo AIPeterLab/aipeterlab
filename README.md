@@ -44,3 +44,30 @@ This redirect is not implemented in `_redirects` because Cloudflare Pages `_redi
 - `/metlife/`
 
 Some dashboard pages are placeholders so the public paths are stable before each dashboard is migrated.
+
+## Cloudflare signal scheduler
+
+This repo also contains a separate Cloudflare Worker, `aipeterlab-signal-scheduler`, that can replace GitHub's unreliable `schedule` event for the three signal dashboards.
+
+The Worker runs at `22:20` and `23:20` UTC and dispatches GitHub workflows only when the current hour in `America/New_York` is `18`. That keeps the effective refresh time at 6 PM New York time across daylight-saving changes.
+
+Target workflows:
+
+- `AIPeterLab/qqq-qld-signal-desk` -> `.github/workflows/daily-update.yml`
+- `AIPeterLab/spy-sso-signal-desk` -> `.github/workflows/daily-update.yml`
+- `AIPeterLab/btc-cycle-signal-desk` -> `.github/workflows/daily-update.yml`
+
+Required Cloudflare Worker secret:
+
+- `GITHUB_TOKEN`: GitHub fine-grained token with access to the three repositories and `Actions: Read and write`.
+
+Optional Cloudflare Worker secret:
+
+- `SCHEDULER_ADMIN_TOKEN`: enables authenticated manual `POST /run` dispatches.
+
+Deploy:
+
+```powershell
+npx wrangler secret put GITHUB_TOKEN
+npx wrangler deploy
+```

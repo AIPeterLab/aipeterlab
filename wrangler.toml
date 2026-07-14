@@ -1,0 +1,9 @@
+name = "aipeterlab-signal-scheduler"
+main = "worker/signal-scheduler.js"
+compatibility_date = "2026-07-14"
+
+[triggers]
+crons = [
+  "20 22 * * *",
+  "20 23 * * *",
+]
