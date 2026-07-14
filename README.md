@@ -39,7 +39,7 @@ This redirect is not implemented in `_redirects` because Cloudflare Pages `_redi
 
 - `/`
 - `https://qld.aipeterlab.com/`
-- `/sso/`
+- `https://sso.aipeterlab.com/`
 - `https://btc.aipeterlab.com/`
 - `/metlife/`
 
