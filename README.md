@@ -38,9 +38,9 @@ This redirect is not implemented in `_redirects` because Cloudflare Pages `_redi
 ## Current pages
 
 - `/`
-- `/qld/`
+- `https://qld.aipeterlab.com/`
 - `/sso/`
-- `/btc/`
+- `https://btc.aipeterlab.com/`
 - `/metlife/`
 
-The dashboard pages are placeholders so the public paths are stable before each dashboard is migrated.
+Some dashboard pages are placeholders so the public paths are stable before each dashboard is migrated.
