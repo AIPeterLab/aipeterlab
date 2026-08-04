@@ -39,6 +39,10 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "GET") {
+      if (url.pathname === "/auth-check") {
+        return jsonResponse({ ok: false, error: "Not found" }, 404);
+      }
+
       return jsonResponse({
         ok: true,
         service: "aipeterlab-signal-scheduler",
@@ -53,11 +57,16 @@ export default {
         return jsonResponse({ ok: false, error: authResult.error }, authResult.status);
       }
 
+      const targetResult = await getTargetDashboards(request);
+      if (!targetResult.ok) {
+        return jsonResponse({ ok: false, error: targetResult.error }, targetResult.status);
+      }
+
       const result = await dispatchAll(env, {
         trigger: "manual",
         cron: "manual",
         scheduledTime: Date.now(),
-      });
+      }, targetResult.dashboards);
       return jsonResponse(result, result.ok ? 200 : 500);
     }
 
@@ -87,7 +96,7 @@ async function runScheduledRefresh(env, scheduledTime, cron) {
   }
 }
 
-async function dispatchAll(env, context) {
+async function dispatchAll(env, context, dashboards = DASHBOARDS) {
   if (!env.GITHUB_TOKEN) {
     return {
       ok: false,
@@ -97,7 +106,7 @@ async function dispatchAll(env, context) {
   }
 
   const results = await Promise.all(
-    DASHBOARDS.map((dashboard) => dispatchWorkflow(env.GITHUB_TOKEN, dashboard, context)),
+    dashboards.map((dashboard) => dispatchWorkflow(env.GITHUB_TOKEN, dashboard, context)),
   );
 
   return {
@@ -105,6 +114,47 @@ async function dispatchAll(env, context) {
     context,
     results,
   };
+}
+
+async function getTargetDashboards(request) {
+  const rawBody = await request.text();
+  if (!rawBody.trim()) {
+    return { ok: true, dashboards: DASHBOARDS };
+  }
+
+  let body;
+  try {
+    body = JSON.parse(rawBody);
+  } catch {
+    return {
+      ok: false,
+      status: 400,
+      error: "Request body must be valid JSON.",
+    };
+  }
+
+  if (!Array.isArray(body.repos) || body.repos.length === 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: "Request body must include a non-empty repos array.",
+    };
+  }
+
+  const requested = new Set(body.repos);
+  const dashboards = DASHBOARDS.filter((dashboard) => requested.has(dashboard.repo));
+  const found = new Set(dashboards.map((dashboard) => dashboard.repo));
+  const unknown = body.repos.filter((repo) => !found.has(repo));
+
+  if (unknown.length > 0) {
+    return {
+      ok: false,
+      status: 400,
+      error: `Unknown dashboard repo(s): ${unknown.join(", ")}`,
+    };
+  }
+
+  return { ok: true, dashboards };
 }
 
 async function dispatchWorkflow(githubToken, dashboard, context) {
