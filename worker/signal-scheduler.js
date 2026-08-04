@@ -18,6 +18,16 @@ const DASHBOARDS = [
     repo: "btc-cycle-signal-desk",
     ref: "main",
   },
+  {
+    name: "IRA Reserve & Growth Desk",
+    repo: "ira-retirement-desk",
+    ref: "main",
+  },
+  {
+    name: "Roth Estate-Growth Desk",
+    repo: "roth-estate-growth-desk",
+    ref: "main",
+  },
 ];
 
 export default {
