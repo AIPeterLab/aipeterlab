@@ -1,6 +1,6 @@
 const GITHUB_OWNER = "AIPeterLab";
-const WORKFLOW_FILE = "daily-update.yml";
-const TARGET_NEW_YORK_HOUR = "18";
+const DEFAULT_WORKFLOW_FILE = "daily-update.yml";
+const TARGET_NEW_YORK_HOUR = "17";
 
 const DASHBOARDS = [
   {
@@ -28,6 +28,12 @@ const DASHBOARDS = [
     repo: "roth-estate-growth-desk",
     ref: "main",
   },
+  {
+    name: "Indicator Dashboard",
+    repo: "indicator-desk",
+    ref: "main",
+    workflow: "update-dashboard.yml",
+  },
 ];
 
 export default {
@@ -46,8 +52,13 @@ export default {
       return jsonResponse({
         ok: true,
         service: "aipeterlab-signal-scheduler",
-        dashboards: DASHBOARDS.map(({ name, repo, ref }) => ({ name, repo, ref })),
-        schedule: "Dispatches at 6:15 PM America/New_York via 22:15/23:15 UTC cron gates.",
+        dashboards: DASHBOARDS.map(({ name, repo, ref, workflow = DEFAULT_WORKFLOW_FILE }) => ({
+          name,
+          repo,
+          ref,
+          workflow,
+        })),
+        schedule: "Dispatches at 5:00 PM America/New_York via 21:00/22:00 UTC cron gates.",
       });
     }
 
@@ -158,7 +169,8 @@ async function getTargetDashboards(request) {
 }
 
 async function dispatchWorkflow(githubToken, dashboard, context) {
-  const endpoint = `https://api.github.com/repos/${GITHUB_OWNER}/${dashboard.repo}/actions/workflows/${WORKFLOW_FILE}/dispatches`;
+  const workflow = dashboard.workflow || DEFAULT_WORKFLOW_FILE;
+  const endpoint = `https://api.github.com/repos/${GITHUB_OWNER}/${dashboard.repo}/actions/workflows/${workflow}/dispatches`;
   const response = await fetch(endpoint, {
     method: "POST",
     headers: {
