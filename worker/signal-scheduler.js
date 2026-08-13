@@ -1,6 +1,10 @@
 const GITHUB_OWNER = "AIPeterLab";
 const DEFAULT_WORKFLOW_FILE = "daily-update.yml";
 const TARGET_NEW_YORK_HOUR = "17";
+const QQQ_REPO = "qqq-qld-signal-desk";
+const QQQ_DEPENDENTS = new Set(["ira-retirement-desk", "roth-estate-growth-desk"]);
+const WORKFLOW_TIMEOUT_MS = 15 * 60 * 1000;
+const WORKFLOW_POLL_MS = 10 * 1000;
 
 const DASHBOARDS = [
   {
@@ -116,9 +120,31 @@ async function dispatchAll(env, context, dashboards = DASHBOARDS) {
     };
   }
 
-  const results = await Promise.all(
-    dashboards.map((dashboard) => dispatchWorkflow(env.GITHUB_TOKEN, dashboard, context)),
+  const requestedDependents = dashboards.filter((dashboard) => QQQ_DEPENDENTS.has(dashboard.repo));
+  const independent = dashboards.filter(
+    (dashboard) => dashboard.repo !== QQQ_REPO && !QQQ_DEPENDENTS.has(dashboard.repo),
   );
+  const qqqRequested = dashboards.some((dashboard) => dashboard.repo === QQQ_REPO);
+  const results = await Promise.all(
+    independent.map((dashboard) => dispatchWorkflow(env.GITHUB_TOKEN, dashboard, context)),
+  );
+
+  if (qqqRequested || requestedDependents.length > 0) {
+    const qqq = DASHBOARDS.find((dashboard) => dashboard.repo === QQQ_REPO);
+    const qqqDispatch = await dispatchWorkflow(env.GITHUB_TOKEN, qqq, context);
+    results.push(qqqDispatch);
+
+    if (qqqDispatch.ok) {
+      const completion = await waitForWorkflowCompletion(env.GITHUB_TOKEN, qqq, qqqDispatch.dispatchedAt);
+      results.push(completion);
+      if (completion.ok) {
+        const dependentResults = await Promise.all(
+          requestedDependents.map((dashboard) => dispatchWorkflow(env.GITHUB_TOKEN, dashboard, context)),
+        );
+        results.push(...dependentResults);
+      }
+    }
+  }
 
   return {
     ok: results.every((result) => result.ok),
@@ -192,6 +218,7 @@ async function dispatchWorkflow(githubToken, dashboard, context) {
       name: dashboard.name,
       repo: dashboard.repo,
       status: response.status,
+      dispatchedAt: new Date().toISOString(),
     };
   }
 
@@ -233,6 +260,52 @@ function validateAdminRequest(request, env) {
   }
 
   return { ok: true };
+}
+
+async function waitForWorkflowCompletion(githubToken, dashboard, dispatchedAt) {
+  const workflow = dashboard.workflow || DEFAULT_WORKFLOW_FILE;
+  const endpoint = `https://api.github.com/repos/${GITHUB_OWNER}/${dashboard.repo}/actions/workflows/${workflow}/runs?event=workflow_dispatch&per_page=20`;
+  const deadline = Date.now() + WORKFLOW_TIMEOUT_MS;
+  const notBefore = Date.parse(dispatchedAt) - 5000;
+
+  while (Date.now() < deadline) {
+    const response = await githubRequest(githubToken, endpoint);
+    if (!response.ok) {
+      return { ok: false, name: `${dashboard.name} completion`, repo: dashboard.repo, status: response.status, body: await response.text() };
+    }
+
+    const payload = await response.json();
+    const run = payload.workflow_runs.find(
+      (candidate) => candidate.head_branch === dashboard.ref && Date.parse(candidate.created_at) >= notBefore,
+    );
+    if (run?.status === "completed") {
+      return {
+        ok: run.conclusion === "success",
+        name: `${dashboard.name} completion`,
+        repo: dashboard.repo,
+        status: run.status,
+        conclusion: run.conclusion,
+        runId: run.id,
+        htmlUrl: run.html_url,
+      };
+    }
+    await new Promise((resolve) => setTimeout(resolve, WORKFLOW_POLL_MS));
+  }
+
+  return { ok: false, name: `${dashboard.name} completion`, repo: dashboard.repo, status: "timed_out" };
+}
+
+function githubRequest(githubToken, endpoint, init = {}) {
+  return fetch(endpoint, {
+    ...init,
+    headers: {
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${githubToken}`,
+      "User-Agent": "aipeterlab-signal-scheduler",
+      "X-GitHub-Api-Version": "2022-11-28",
+      ...(init.headers || {}),
+    },
+  });
 }
 
 function jsonResponse(payload, status = 200) {
