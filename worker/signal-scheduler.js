@@ -2,7 +2,11 @@ const GITHUB_OWNER = "AIPeterLab";
 const DEFAULT_WORKFLOW_FILE = "daily-update.yml";
 const TARGET_NEW_YORK_HOUR = "17";
 const QQQ_REPO = "qqq-qld-signal-desk";
-const QQQ_DEPENDENTS = new Set(["ira-retirement-desk", "roth-estate-growth-desk"]);
+const SOURCE_REPOS = new Set([QQQ_REPO, "spy-sso-signal-desk"]);
+const DEPENDENCIES = {
+  "ira-retirement-desk": [QQQ_REPO, "spy-sso-signal-desk"],
+  "roth-estate-growth-desk": [QQQ_REPO],
+};
 const WORKFLOW_TIMEOUT_MS = 15 * 60 * 1000;
 const WORKFLOW_POLL_MS = 10 * 1000;
 
@@ -120,30 +124,36 @@ async function dispatchAll(env, context, dashboards = DASHBOARDS) {
     };
   }
 
-  const requestedDependents = dashboards.filter((dashboard) => QQQ_DEPENDENTS.has(dashboard.repo));
+  const requestedDependents = dashboards.filter((dashboard) => DEPENDENCIES[dashboard.repo]);
   const independent = dashboards.filter(
-    (dashboard) => dashboard.repo !== QQQ_REPO && !QQQ_DEPENDENTS.has(dashboard.repo),
+    (dashboard) => !SOURCE_REPOS.has(dashboard.repo) && !DEPENDENCIES[dashboard.repo],
   );
-  const qqqRequested = dashboards.some((dashboard) => dashboard.repo === QQQ_REPO);
   const results = await Promise.all(
     independent.map((dashboard) => dispatchWorkflow(env.GITHUB_TOKEN, dashboard, context)),
   );
 
-  if (qqqRequested || requestedDependents.length > 0) {
-    const qqq = DASHBOARDS.find((dashboard) => dashboard.repo === QQQ_REPO);
-    const qqqDispatch = await dispatchWorkflow(env.GITHUB_TOKEN, qqq, context);
-    results.push(qqqDispatch);
+  const requestedSources = new Set(dashboards.filter((dashboard) => SOURCE_REPOS.has(dashboard.repo)).map((dashboard) => dashboard.repo));
+  for (const dependent of requestedDependents) {
+    for (const sourceRepo of DEPENDENCIES[dependent.repo]) requestedSources.add(sourceRepo);
+  }
+  const sources = DASHBOARDS.filter((dashboard) => requestedSources.has(dashboard.repo));
+  const sourceDispatches = await Promise.all(sources.map((source) => dispatchWorkflow(env.GITHUB_TOKEN, source, context)));
+  results.push(...sourceDispatches);
+  const completions = await Promise.all(sourceDispatches.filter((result) => result.ok).map((result) => {
+    const source = sources.find((dashboard) => dashboard.repo === result.repo);
+    return waitForWorkflowCompletion(env.GITHUB_TOKEN, source, result.dispatchedAt);
+  }));
+  results.push(...completions);
 
-    if (qqqDispatch.ok) {
-      const completion = await waitForWorkflowCompletion(env.GITHUB_TOKEN, qqq, qqqDispatch.dispatchedAt);
-      results.push(completion);
-      if (completion.ok) {
-        const dependentResults = await Promise.all(
-          requestedDependents.map((dashboard) => dispatchWorkflow(env.GITHUB_TOKEN, dashboard, context)),
-        );
-        results.push(...dependentResults);
-      }
-    }
+  const successfulSources = new Set(completions.filter((result) => result.ok).map((result) => result.repo));
+  const readyDependents = requestedDependents.filter((dependent) =>
+    DEPENDENCIES[dependent.repo].every((sourceRepo) => successfulSources.has(sourceRepo)),
+  );
+  if (readyDependents.length > 0) {
+    const dependentResults = await Promise.all(
+      readyDependents.map((dashboard) => dispatchWorkflow(env.GITHUB_TOKEN, dashboard, context)),
+    );
+    results.push(...dependentResults);
   }
 
   return {
