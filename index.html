@@ -44,18 +44,18 @@
 
       <section class="summary-strip" aria-label="Current dashboard summary">
         <h2>Summary</h2>
-        <div class="summary-grid">
+        <div class="summary-grid" aria-live="polite">
           <div class="summary-item">
             <span>QQQ Desk</span>
-            <strong>Hold QQQ</strong>
+            <strong id="qqq-summary">Loading…</strong>
           </div>
           <div class="summary-item">
             <span>SPY Desk</span>
-            <strong>Hold SSO</strong>
+            <strong id="spy-summary">Loading…</strong>
           </div>
           <div class="summary-item">
             <span>BTC Desk</span>
-            <strong>Cash</strong>
+            <strong id="btc-summary">Loading…</strong>
           </div>
         </div>
       </section>
@@ -116,5 +116,44 @@
       <a href="https://aipeterlab.com/">aipeterlab.com</a>
       <a href="https://blog.aipeterlab.com/">Blog</a>
     </footer>
+    <script>
+      const summaries = [
+        {
+          id: "qqq-summary",
+          url: "https://qld.aipeterlab.com/data/signals.json",
+          read: (data) => data.current?.headline_status
+        },
+        {
+          id: "spy-summary",
+          url: "https://sso.aipeterlab.com/data/signals.json",
+          read: (data) => data.summary?.headline_status
+        },
+        {
+          id: "btc-summary",
+          url: "https://btc.aipeterlab.com/data/signals.json",
+          read: (data) => data.status
+        }
+      ];
+
+      summaries.forEach(async ({ id, url, read }) => {
+        const output = document.getElementById(id);
+
+        try {
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+          const value = read(await response.json());
+          if (typeof value !== "string" || !value.trim()) {
+            throw new Error("Missing current position");
+          }
+
+          output.textContent = value;
+        } catch (error) {
+          output.textContent = "Unavailable";
+          output.title = "The live signal source could not be loaded.";
+          console.error(`Unable to load ${id}`, error);
+        }
+      });
+    </script>
   </body>
 </html>
