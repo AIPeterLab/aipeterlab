@@ -1,7 +1,9 @@
 const GITHUB_OWNER = "AIPeterLab";
 const DEFAULT_WORKFLOW_FILE = "daily-update.yml";
-const TARGET_NEW_YORK_HOUR = "17";
+const INITIAL_REFRESH_TIME = "18:15";
+const RETRY_REFRESH_TIMES = new Set(["18:30", "18:45", "19:00"]);
 const QQQ_REPO = "qqq-qld-signal-desk";
+const QLD_STATUS_URL = `https://raw.githubusercontent.com/${GITHUB_OWNER}/${QQQ_REPO}/main/data/signals.json`;
 const SOURCE_REPOS = new Set([QQQ_REPO, "spy-sso-signal-desk"]);
 const DEPENDENCIES = {
   "ira-retirement-desk": [QQQ_REPO, "spy-sso-signal-desk"],
@@ -66,7 +68,7 @@ export default {
           ref,
           workflow,
         })),
-        schedule: "Dispatches at 5:00 PM America/New_York via 21:00/22:00 UTC cron gates.",
+        schedule: "All dashboards dispatch once at 6:15 PM America/New_York. QLD and its dependent dashboards retry through 7:00 PM only while QLD data is stale.",
       });
     }
 
@@ -95,23 +97,91 @@ export default {
 
 async function runScheduledRefresh(env, scheduledTime, cron) {
   const now = new Date(scheduledTime);
-  const newYorkHour = getNewYorkHour(now);
+  const newYork = getNewYorkScheduleParts(now);
+  const initialMode = getRefreshMode(newYork, false);
 
-  if (newYorkHour !== TARGET_NEW_YORK_HOUR) {
+  if (initialMode === "skip") {
     console.log(
-      `Skipping cron ${cron}; New York hour is ${newYorkHour}, target is ${TARGET_NEW_YORK_HOUR}.`,
+      `Skipping cron ${cron}; New York date/time is ${newYork.date} ${newYork.time} (${newYork.weekday}).`,
     );
     return;
   }
 
-  const result = await dispatchAll(env, {
+  const context = {
     trigger: "cron",
     cron,
     scheduledTime,
-  });
+    newYorkDate: newYork.date,
+    newYorkTime: newYork.time,
+  };
+
+  let result;
+  if (initialMode === "all") {
+    result = await dispatchAll(env, context);
+  } else {
+    const qldCurrent = await isQldCurrentForDate(newYork.date, scheduledTime);
+    if (getRefreshMode(newYork, qldCurrent) === "skip") {
+      console.log(`Skipping QLD retry at ${newYork.time}; QLD already has ${newYork.date}.`);
+      return;
+    }
+    result = await dispatchQldRetry(env, context);
+  }
 
   if (!result.ok) {
     throw new Error(`One or more workflow dispatches failed: ${JSON.stringify(result.results)}`);
+  }
+}
+
+async function dispatchQldRetry(env, context) {
+  if (!env.GITHUB_TOKEN) {
+    return {
+      ok: false,
+      error: "Missing required Cloudflare Worker secret: GITHUB_TOKEN",
+      results: [],
+    };
+  }
+
+  const retryRepos = new Set(getQldRetryRepos());
+  const retryDashboards = DASHBOARDS.filter((dashboard) => retryRepos.has(dashboard.repo));
+  const qld = retryDashboards.find((dashboard) => dashboard.repo === QQQ_REPO);
+  const dependents = retryDashboards.filter((dashboard) => dashboard.repo !== QQQ_REPO);
+  const results = [];
+  const dispatch = await dispatchWorkflow(env.GITHUB_TOKEN, qld, context);
+  results.push(dispatch);
+  if (!dispatch.ok) return { ok: false, context, results };
+
+  const completion = await waitForWorkflowCompletion(
+    env.GITHUB_TOKEN,
+    qld,
+    dispatch.dispatchedAt,
+  );
+  results.push(completion);
+  if (!completion.ok) return { ok: false, context, results };
+
+  const dependentResults = await Promise.all(
+    dependents.map((dashboard) =>
+      dispatchWorkflow(env.GITHUB_TOKEN, dashboard, context),
+    ),
+  );
+  results.push(...dependentResults);
+  return { ok: results.every((result) => result.ok), context, results };
+}
+
+async function isQldCurrentForDate(newYorkDate, scheduledTime) {
+  try {
+    const response = await fetch(`${QLD_STATUS_URL}?scheduled=${scheduledTime}`, {
+      headers: { Accept: "application/json" },
+      cf: { cacheTtl: 0 },
+    });
+    if (!response.ok) {
+      console.warn(`Could not verify QLD market date: HTTP ${response.status}.`);
+      return false;
+    }
+    const payload = await response.json();
+    return payload.last_updated === newYorkDate;
+  } catch (error) {
+    console.warn(`Could not verify QLD market date: ${error}`);
+    return false;
   }
 }
 
@@ -243,12 +313,39 @@ async function dispatchWorkflow(githubToken, dashboard, context) {
   };
 }
 
-function getNewYorkHour(date) {
-  return new Intl.DateTimeFormat("en-US", {
+export function getNewYorkScheduleParts(date) {
+  const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
     hour: "2-digit",
+    minute: "2-digit",
     hourCycle: "h23",
-  }).format(date);
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map(({ type, value }) => [type, value]));
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}`,
+    weekday: values.weekday,
+  };
+}
+
+export function getRefreshMode(newYork, qldCurrent) {
+  if (["Sat", "Sun"].includes(newYork.weekday)) return "skip";
+  if (newYork.time === INITIAL_REFRESH_TIME) return "all";
+  if (RETRY_REFRESH_TIMES.has(newYork.time)) return qldCurrent ? "skip" : "qld_retry";
+  return "skip";
+}
+
+export function getQldRetryRepos() {
+  return [
+    QQQ_REPO,
+    ...DASHBOARDS.filter((dashboard) =>
+      DEPENDENCIES[dashboard.repo]?.includes(QQQ_REPO),
+    ).map((dashboard) => dashboard.repo),
+  ];
 }
 
 function validateAdminRequest(request, env) {

@@ -51,7 +51,7 @@ Some dashboard pages are placeholders so the public paths are stable before each
 
 This repo also contains a separate Cloudflare Worker, `aipeterlab-signal-scheduler`, that can replace GitHub's unreliable `schedule` event for the signal dashboards.
 
-The Worker runs at `22:15` and `23:15` UTC and dispatches GitHub workflows only when the current hour in `America/New_York` is `18`. That keeps the effective refresh time at 6:15 PM New York time across daylight-saving changes.
+The Worker uses UTC cron candidates and an `America/New_York` gate so all dashboards dispatch once at 6:15 PM New York time across daylight-saving changes. At 6:30, 6:45, and 7:00 PM, it checks QLD's published market date. Only when QLD is still stale does it retry QLD and, after QLD succeeds, its IRA and Roth dependents. Independent dashboards are not refreshed again.
 
 Target workflows:
 
